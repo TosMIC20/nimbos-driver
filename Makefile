@@ -13,10 +13,10 @@ subdir-y := apps/
 obj-m := driver/
 
 build:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
+	$(MAKE) -C $(KDIR) M=$$PWD modules
 
 clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
+	$(MAKE) -C $(KDIR) M=$$PWD clean
 
 insmod: rmmod
 	sudo insmod driver/$(module).ko

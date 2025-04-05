@@ -2,6 +2,7 @@
 #include <sys/errno.h>
 
 #include "scf.h"
+#include "remap.h"
 
 #define ALIGN_UP(addr, align) ((addr + align - 1) & ~(align - 1))
 
@@ -12,13 +13,16 @@ struct syscall_queue_buffer g_syscall_queue_buffer;
 
 int nimbos_setup_syscall_buffers(int nimbos_fd)
 {
-    syscall_data_buf_base = mmap(0, NIMBOS_SYSCALL_DATA_BUF_SIZE, PROT_READ | PROT_WRITE,
+    void *syscall_data_buf_base_vaddr = (void *)NIMBOS_KERNEL_PADDR_TO_VADDR((void *)NIMBOS_SYSCALL_DATA_BUF_PADDR);
+    void *syscall_queue_buf_base_vaddr = (void *)NIMBOS_KERNEL_PADDR_TO_VADDR((void *)NIMBOS_SYSCALL_QUEUE_BUF_PADDR);
+
+    syscall_data_buf_base = mmap(syscall_data_buf_base_vaddr, NIMBOS_SYSCALL_DATA_BUF_SIZE, PROT_READ | PROT_WRITE,
                                  MAP_SHARED | MAP_POPULATE, nimbos_fd, 0);
     if (syscall_data_buf_base == MAP_FAILED) {
         return -ENOMEM;
     }
 
-    syscall_queue_buf_base = mmap(0, NIMBOS_SYSCALL_QUEUE_BUF_SIZE, PROT_READ | PROT_WRITE,
+    syscall_queue_buf_base = mmap(syscall_queue_buf_base_vaddr, NIMBOS_SYSCALL_QUEUE_BUF_SIZE, PROT_READ | PROT_WRITE,
                                   MAP_SHARED | MAP_POPULATE, nimbos_fd, 0x1000);
     if (syscall_queue_buf_base == MAP_FAILED) {
         return -ENOMEM;

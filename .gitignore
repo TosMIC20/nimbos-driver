@@ -6,3 +6,4 @@
 *.mod
 Module.symvers
 modules.order
+.vscode
