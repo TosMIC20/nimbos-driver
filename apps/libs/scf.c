@@ -10,24 +10,28 @@ static void *syscall_data_buf_base;
 static void *syscall_queue_buf_base;
 
 struct syscall_queue_buffer g_syscall_queue_buffer;
+int g_nimbos_fd;
 
 int nimbos_setup_syscall_buffers(int nimbos_fd)
 {
-    void *syscall_data_buf_base_vaddr = (void *)NIMBOS_KERNEL_PADDR_TO_VADDR((void *)NIMBOS_SYSCALL_DATA_BUF_PADDR);
-    void *syscall_queue_buf_base_vaddr = (void *)NIMBOS_KERNEL_PADDR_TO_VADDR((void *)NIMBOS_SYSCALL_QUEUE_BUF_PADDR);
+    void *syscall_data_buf_base_vaddr = (void *)SHADOW_KERNEL_PADDR_TO_VADDR((void *)NIMBOS_SYSCALL_DATA_BUF_PADDR);
+    void *syscall_queue_buf_base_vaddr = (void *)SHADOW_KERNEL_PADDR_TO_VADDR((void *)NIMBOS_SYSCALL_QUEUE_BUF_PADDR);
 
+
+    printf("Shadow: map [%p, %p)\n", syscall_data_buf_base_vaddr, syscall_data_buf_base_vaddr + NIMBOS_SYSCALL_DATA_BUF_SIZE);
     syscall_data_buf_base = mmap(syscall_data_buf_base_vaddr, NIMBOS_SYSCALL_DATA_BUF_SIZE, PROT_READ | PROT_WRITE,
-                                 MAP_SHARED | MAP_POPULATE, nimbos_fd, 0);
+                                 MAP_SHARED | MAP_POPULATE, nimbos_fd, NIMBOS_SYSCALL_DATA_BUF_PADDR - NIMBOS_BASE_PADDR);
     if (syscall_data_buf_base == MAP_FAILED) {
         return -ENOMEM;
     }
 
+    printf("Shadow: map [%p, %p)\n", syscall_queue_buf_base_vaddr, syscall_queue_buf_base_vaddr + NIMBOS_SYSCALL_QUEUE_BUF_SIZE);
     syscall_queue_buf_base = mmap(syscall_queue_buf_base_vaddr, NIMBOS_SYSCALL_QUEUE_BUF_SIZE, PROT_READ | PROT_WRITE,
-                                  MAP_SHARED | MAP_POPULATE, nimbos_fd, 0x1000);
+                                  MAP_SHARED | MAP_POPULATE, nimbos_fd, NIMBOS_SYSCALL_QUEUE_BUF_PADDR - NIMBOS_BASE_PADDR);
     if (syscall_queue_buf_base == MAP_FAILED) {
         return -ENOMEM;
     }
-    // printf("%p %p\n", syscall_data_buf_base, syscall_queue_buf_base);
+    printf("Shadow: Actual address: %p %p\n", syscall_data_buf_base, syscall_queue_buf_base);
 
     struct syscall_queue_buffer_metadata *meta = syscall_queue_buf_base;
     struct scf_descriptor *desc;
@@ -58,6 +62,8 @@ int nimbos_setup_syscall_buffers(int nimbos_fd)
         .rsp_ring = rsp_ring,
     };
 
+    g_nimbos_fd = nimbos_fd;
+
     return 0;
 }
 
@@ -69,6 +75,10 @@ inline void *offset_to_ptr(uint64_t offset)
 inline struct syscall_queue_buffer *get_syscall_queue_buffer()
 {
     return &g_syscall_queue_buffer;
+}
+
+inline int *get_nimbos_fd() {
+    return &g_nimbos_fd;
 }
 
 static inline int has_request(struct syscall_queue_buffer *buf)

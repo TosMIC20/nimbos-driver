@@ -2,7 +2,7 @@ LD = $(CC) $(KBUILD_CFLAGS) $(KBUILD_LDLAGS) -pthread -lpthread
 
 NOSTDINC_FLAGS :=
 LINUXINCLUDE := -I$(src)/include
-KBUILD_LDFLAGS := -Wl,--Ttext-segment=0x10000000
+KBUILD_LDFLAGS := -Wl,--Ttext-segment=0x20000000
 KBUILD_CFLAGS := -g -O3 -Wall -Werror -D__LINUX_COMPILER_TYPES_H
 
 always := hello

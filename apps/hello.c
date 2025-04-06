@@ -4,6 +4,7 @@
 
 #include <nimbos.h>
 #include <remap.h>
+#include <scf.h>
 
 int main()
 {
@@ -34,6 +35,8 @@ int main()
         printf("Failed to open NimbOS device `%s`\n", NIMBOS_DEV);
         return fd;
     }
+
+    printf("NimbOS device opened with fd %d\n", fd);
 
     for (;;) {
         // printf("Sleep %d...\n", i);

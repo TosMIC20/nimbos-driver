@@ -9,6 +9,13 @@
 #include "nimbos.h"
 #include "scf.h"
 
+struct sync_map_args {
+    uint64_t vaddr;
+    uint64_t len;
+    uint64_t paddr;
+    int flags;
+};
+
 struct read_write_args {
     int fd;
     uint64_t buf_offset;
@@ -34,11 +41,12 @@ static void *read_thread_fn(void *arg)
     return NULL;
 }
 
-static void poll_requests(void)
+void poll_requests(void)
 {
     uint16_t desc_index;
     struct scf_descriptor desc;
     struct syscall_queue_buffer *scf_buf = get_syscall_queue_buffer();
+    int nimbos_fd = *get_nimbos_fd();
     pthread_t thread; // FIXME: use global threads pool
 
     while (!pop_syscall_request(scf_buf, &desc_index, &desc)) {
@@ -55,6 +63,19 @@ static void poll_requests(void)
             int ret = write(args->fd, buf, args->len);
             assert(ret == args->len);
             push_syscall_response(scf_buf, desc_index, ret);
+            break;
+        }
+        case IPC_OP_SYNCMAP: {
+            struct sync_map_args *args = offset_to_ptr(desc.args);
+            void *vaddr = (void *)args->vaddr;
+            // printf("Shadow: mmap vaddr=%p, len=%lu, paddr=%lx, flags=%x, fd=%d\n", vaddr, args->len, args->paddr, args->flags, nimbos_fd);
+            void* mapped_ptr = mmap(vaddr, args->len, args->flags, MAP_SHARED | MAP_FIXED, nimbos_fd, args->paddr - NIMBOS_BASE_PADDR);
+            int ret = 0;
+            if (mapped_ptr == MAP_FAILED) {
+                ret = -1;
+            }
+            push_syscall_response(scf_buf, desc_index, ret);
+            // printf("Shadow: mmap ret=%d, mapped_ptr=%p\n", ret, mapped_ptr);
             break;
         }
         default:
