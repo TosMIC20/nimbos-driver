@@ -22,9 +22,15 @@ struct read_write_args {
     uint64_t len;
 };
 
+struct read_write_args_new {
+    int fd;
+    uint64_t buf;
+    uint64_t len;
+};
+
 static void *read_thread_fn(void *arg)
 {
-    struct read_write_args *args;
+    struct read_write_args_new *args;
     struct syscall_queue_buffer *scf_buf = get_syscall_queue_buffer();
     uint16_t desc_index = (uint16_t)(long)arg;
     struct scf_descriptor *desc = get_syscall_request_from_index(scf_buf, desc_index);
@@ -34,7 +40,7 @@ static void *read_thread_fn(void *arg)
     }
 
     args = offset_to_ptr(desc->args);
-    char *buf = offset_to_ptr(args->buf_offset);
+    char *buf = (char *)args->buf;
     int ret = read(args->fd, buf, args->len);
     // assert(ret == args->len);
     push_syscall_response(scf_buf, desc_index, ret);
@@ -58,8 +64,8 @@ void poll_requests(void)
             break;
         }
         case IPC_OP_WRITE: {
-            struct read_write_args *args = offset_to_ptr(desc.args);
-            char *buf = offset_to_ptr(args->buf_offset);
+            struct read_write_args_new *args = offset_to_ptr(desc.args);
+            char *buf = (char *)args->buf;
             int ret = write(args->fd, buf, args->len);
             assert(ret == args->len);
             push_syscall_response(scf_buf, desc_index, ret);
