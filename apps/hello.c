@@ -36,7 +36,7 @@ int main()
         return fd;
     }
 
-    printf("NimbOS device opened with fd %d\n", fd);
+    // printf("NimbOS device opened wsith fd %d\n", fd);
 
     for (;;) {
         // printf("Sleep %d...\n", i);

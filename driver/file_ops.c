@@ -4,7 +4,9 @@
 #include <linux/sched.h>
 
 #include "nimbos.h"
-#include "syscall_handler.h"
+#include "process.h"
+#include "irq.h"
+#include "slot.h"
 
 static const struct vm_operations_struct
 shadow_physical_vm_ops = {
@@ -13,19 +15,19 @@ shadow_physical_vm_ops = {
 #endif
 };
 
-static int nimbos_register_syscall_handler(void)
+static int nimbos_register_process(int slot_num)
 {
-    return add_syscall_handler(get_current());
+    return add_process(get_current(), slot_num);
 }
 
-static int nimbos_deregister_syscall_handler(syscall_handler_t handler)
+static int nimbos_deregister_process(process_t process)
 {
-    return del_syscall_handler(handler);
+    return del_process(process);
 }
 
-static int nimbos_syscall_setup(void)
+static int nimbos_syscall_setup(int slot_num)
 {
-    return nimbos_register_syscall_handler();
+    return nimbos_register_process(slot_num);
 }
 
 int nimbos_open(struct inode *inode, struct file *file)
@@ -37,18 +39,26 @@ int nimbos_open(struct inode *inode, struct file *file)
 int nimbos_close(struct inode *inode, struct file *file)
 {
     pr_info("nimbos_close: %p(%d)\n", get_current(), get_current()->pid);
-    nimbos_deregister_syscall_handler(get_current());
+    nimbos_deregister_process(get_current());
     return 0;
 }
+
 
 long nimbos_ioctl(struct file *file, unsigned int ioctl, unsigned long arg)
 {
     long err;
 
     switch (ioctl) {
-    case NIMBOS_SYSCALL_SETUP:
-        err = nimbos_syscall_setup();
+    case NIMBOS_SYSCALL_SETUP: {
+        int slot_num = allocate_slot_num();
+        if (slot_num < 0) {
+            err = -EBUSY;
+            break;
+        }
+        err = nimbos_syscall_setup(slot_num);
+        copy_to_user((int *)arg, (int *)&slot_num, sizeof(int));
         break;
+    }
     default:
         err = -EINVAL;
         break;

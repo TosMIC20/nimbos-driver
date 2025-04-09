@@ -8,11 +8,12 @@
 #include "spin_lock.h"
 #include "remap.h"
 
-#define NIMBOS_SYSCALL_DATA_BUF_SIZE  (1 << 20) // 1M
 #define NIMBOS_SYSCALL_QUEUE_BUF_SIZE 4096      // 4K
+#define NIMBOS_SYSCALL_SLOT_NUM 16
 
-#define NIMBOS_SYSCALL_DATA_BUF_PADDR NIMBOS_END_PADDR - NIMBOS_SYSCALL_DATA_BUF_SIZE - NIMBOS_SYSCALL_QUEUE_BUF_SIZE
-#define NIMBOS_SYSCALL_QUEUE_BUF_PADDR (NIMBOS_SYSCALL_DATA_BUF_PADDR + NIMBOS_SYSCALL_DATA_BUF_SIZE)
+#define NIMBOS_SYSCALL_QUEUE_BUF_BASE_PADDR (NIMBOS_END_PADDR - NIMBOS_SYSCALL_SLOT_NUM * NIMBOS_SYSCALL_QUEUE_BUF_SIZE)
+
+#define NIMBOS_SYSCALL_QUEUE_BUF_SLOT_PADDR(slot) (NIMBOS_SYSCALL_QUEUE_BUF_BASE_PADDR + (slot) * NIMBOS_SYSCALL_QUEUE_BUF_SIZE)
 
 
 #define SYSCALL_QUEUE_BUFFER_MAGIC 0x4643537f // "\x7fSCF"
@@ -24,6 +25,8 @@ enum scf_opcode {
     IPC_OP_OPEN = 3,
     IPC_OP_CLOSE = 4,
     IPC_OP_SYNCMAP = 5,
+    IPC_OP_SYNCUNMAP = 6,
+    IPC_OP_SYNCFORK = 7,
     IPC_OP_UNKNOWN = 0xff,
 };
 
@@ -38,7 +41,7 @@ struct syscall_queue_buffer_metadata {
 struct scf_descriptor {
     uint8_t valid;
     uint8_t opcode;
-    uint64_t args;
+    uint64_t args[4];
     uint64_t ret_val;
 };
 
@@ -53,15 +56,17 @@ struct syscall_queue_buffer {
 };
 
 _Static_assert(sizeof(struct syscall_queue_buffer_metadata) == 0xc);
-_Static_assert(sizeof(struct scf_descriptor) == 0x18);
+_Static_assert(sizeof(struct scf_descriptor) == 0x30);
 
-int nimbos_setup_syscall_buffers(int nimbos_fd);
+int nimbos_setup_syscall_buffers(int nimbos_fd, int slot_num);
 
-void *offset_to_ptr(uint64_t offset);
 
 struct syscall_queue_buffer *get_syscall_queue_buffer();
 
 int *get_nimbos_fd();
+
+int *get_slot_num();
+void set_slot_num(int slot_num);
 
 struct scf_descriptor *get_syscall_request_from_index(struct syscall_queue_buffer *buf,
                                                       uint16_t index);

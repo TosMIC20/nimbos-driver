@@ -1,6 +1,5 @@
 #include <asm/cacheflush.h>
 #include <linux/firmware.h>
-#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
@@ -8,7 +7,9 @@
 #include "file_ops.h"
 #include "hypercall.h"
 #include "nimbos.h"
-#include "syscall_handler.h"
+#include "process.h"
+#include "irq.h"
+#include "slot.h"
 
 struct mem_region rt_region;
 
@@ -23,7 +24,7 @@ static const struct file_operations nimbos_fops = {
     .mmap = nimbos_mmap,
 };
 
-static struct miscdevice nimbos_device = {
+struct miscdevice nimbos_device = {
     .minor = MISC_DYNAMIC_MINOR,
     .name = "nimbos",
     .fops = &nimbos_fops,
@@ -34,13 +35,6 @@ bool hypercall_use_vmcall;
 static void init_hypercall(void)
 {
     hypercall_use_vmcall = boot_cpu_has(X86_FEATURE_VMX);
-}
-
-static irqreturn_t irq_handler(int irq, void *dev_id)
-{
-    pr_debug("IRQ %d %p(%d)\n", irq, get_current(), get_current()->pid);
-    signal_all_handlers();
-    return IRQ_HANDLED;
 }
 
 static int start_rtos(void)
@@ -134,24 +128,14 @@ static int __init nimbos_init(void)
         goto err_unregister;
     }
 
-    err = request_irq(NIMBOS_SYSCALL_IPI_IRQ, irq_handler, IRQF_SHARED, "nimbos-driver",
-                      &nimbos_device);
-    if (err) {
-        pr_err("nimbos-driver: request_irq %d returns %d\n", NIMBOS_SYSCALL_IPI_IRQ, err);
-        goto err_unregister;
-    }
-
     err = start_rtos();
     if (err) {
         pr_err("nimbos-driver: start RTOS failed\n");
-        goto err_free_irq;
+        goto err_unregister;
     }
 
     pr_info("RTOS is started.\n");
     return 0;
-
-err_free_irq:
-    free_irq(NIMBOS_SYSCALL_IPI_IRQ, &nimbos_device);
 
 err_unregister:
     misc_deregister(&nimbos_device);
@@ -163,8 +147,9 @@ static void __exit nimbos_exit(void)
     pr_info("nimbos-driver: exit...\n");
 
     shutdown_rtos();
-
-    free_irq(NIMBOS_SYSCALL_IPI_IRQ, &nimbos_device);
+    
+    free_all_slots();
+    del_all_processes();
 
     if (rt_mem_res) {
         release_mem_region(rt_mem_res->start, resource_size(rt_mem_res));

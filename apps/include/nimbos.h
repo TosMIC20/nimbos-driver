@@ -6,6 +6,7 @@
 #define NIMBOS_SYSCALL_SIG_NUM 44
 
 #define NIMBOS_SETUP_SYSCALL _IO(0, 0)
+#define NIMBOS_REQUEST_IRQ_NUM _IO(0, 1)
 
 int nimbos_setup_syscall();
 
