@@ -9,7 +9,7 @@
 #include "remap.h"
 
 #define NIMBOS_SYSCALL_QUEUE_BUF_SIZE 4096      // 4K
-#define NIMBOS_SYSCALL_SLOT_NUM 16
+#define NIMBOS_SYSCALL_SLOT_NUM 4
 
 #define NIMBOS_SYSCALL_QUEUE_BUF_BASE_PADDR (NIMBOS_END_PADDR - NIMBOS_SYSCALL_SLOT_NUM * NIMBOS_SYSCALL_QUEUE_BUF_SIZE)
 
@@ -19,14 +19,17 @@
 #define SYSCALL_QUEUE_BUFFER_MAGIC 0x4643537f // "\x7fSCF"
 
 enum scf_opcode {
-    IPC_OP_NOP = 0,
-    IPC_OP_READ = 1,
-    IPC_OP_WRITE = 2,
-    IPC_OP_OPEN = 3,
-    IPC_OP_CLOSE = 4,
+    // IPC_OP_NOP = 0,
+    IPC_OP_READ = 0,
+    IPC_OP_WRITE = 1,
+    IPC_OP_OPEN = 2,
+    IPC_OP_CLOSE = 3,
+    IPC_OP_STAT = 4,
     IPC_OP_SYNCMAP = 5,
     IPC_OP_SYNCUNMAP = 6,
-    IPC_OP_SYNCFORK = 7,
+    IPC_OP_CLONE = 56,
+    IPC_OP_FORK = 57,
+    IPC_OP_EXIT = 60,
     IPC_OP_UNKNOWN = 0xff,
 };
 
@@ -60,6 +63,7 @@ _Static_assert(sizeof(struct scf_descriptor) == 0x30);
 
 int nimbos_setup_syscall_buffers(int nimbos_fd, int slot_num);
 
+int nimbos_reset_syscall_buffer(void);
 
 struct syscall_queue_buffer *get_syscall_queue_buffer();
 

@@ -6,6 +6,7 @@
 #include "nimbos.h"
 #include "irq.h"
 #include "process.h"
+#include "slot.h"
 
 struct process_node {
     struct list_head entry;
@@ -46,6 +47,8 @@ int del_process(process_t process)
         if (h->process == process) {
             list_del(&h->entry);
             unregister_irq(slot_to_irq(h->slot_num));
+            free_slot_num(h->slot_num);
+            pr_info("Slot %d freed.\n", h->slot_num);
             kfree(h);
             return 0;
         }
@@ -60,6 +63,7 @@ void del_all_processes(void) {
     list_for_each_entry_safe(h, tmp, &process_list, entry) {
         list_del(&h->entry);
         unregister_irq(slot_to_irq(h->slot_num));
+        free_slot_num(h->slot_num);
         kfree(h);
     }
 }

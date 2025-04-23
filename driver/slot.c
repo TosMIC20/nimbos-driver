@@ -1,4 +1,5 @@
 #include "slot.h"
+#include <linux/module.h>
 
 
 static int current_slot = 0;

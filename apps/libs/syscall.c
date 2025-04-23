@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "nimbos.h"
@@ -14,6 +15,8 @@
 #include <inttypes.h>
 
 #define BUF_SIZE 1024
+
+static int thread_count = 1;
 
 void print_maps() {
     FILE *fp = fopen("/proc/self/maps", "r");
@@ -52,6 +55,9 @@ static void *read_thread_fn(void *arg)
     args = desc->args;
     int fd = (int)args[0];
     char *buf = (char *)args[1];
+    if ((uint64_t) buf > NIMBOS_KERNEL_BASE_VADDR) {
+        buf = NIMBOS_TO_SHADOW_KERNEL_VADDR(buf);
+    }
     size_t len = (size_t)args[2];
     // printf("Shadow: read fd=%d, buf=%lx, len=%lu\n", fd, (uint64_t)buf, len);
     int ret = read(fd, buf, len);
@@ -74,7 +80,7 @@ void poll_requests(void)
         switch (desc.opcode) {
         case IPC_OP_READ: {
             pthread_create(&thread, NULL, read_thread_fn, (void *)(long)desc_index);
-            return;
+            break;
         }
         case IPC_OP_WRITE: {
             uint64_t *args = desc.args;
@@ -86,7 +92,25 @@ void poll_requests(void)
             // printf("Shadow: write ret=%d\n", ret);
             assert(ret == (int)len);
             push_syscall_response(scf_buf, desc_index, ret);
-            return;
+            break;
+        }
+        case IPC_OP_OPEN: {
+            uint64_t *args = desc.args;
+            char *pathname = (char *)args[0];
+            int flags = (int)args[1];
+            int mode = (int)args[2];
+            // printf("Shadow: open pathname=%s, flags=%x, mode=%o\n", pathname, flags, mode);
+            int ret = open(pathname, flags, mode);
+            push_syscall_response(scf_buf, desc_index, ret);
+            break;
+        }
+        case IPC_OP_CLOSE: {
+            uint64_t *args = desc.args;
+            int fd = (int)args[0];
+            // printf("Shadow: close fd=%d\n", fd);
+            int ret = close(fd);
+            push_syscall_response(scf_buf, desc_index, ret);
+            break;
         }
         case IPC_OP_SYNCMAP: {
             // prepare args
@@ -104,7 +128,7 @@ void poll_requests(void)
             }
             push_syscall_response(scf_buf, desc_index, ret);
             // printf("Shadow: mmap ret=%d, mapped_ptr=%p\n", ret, mapped_ptr);
-            return;
+            break;
         }
         case IPC_OP_SYNCUNMAP: {
             uint64_t *args = desc.args;
@@ -114,14 +138,14 @@ void poll_requests(void)
             // int ret = 0;
             push_syscall_response(scf_buf, desc_index, ret);
             // printf("Shadow: unmap ret=%d\n", ret);
-            return;
+            break;
         }
-        case IPC_OP_SYNCFORK: {
+        case IPC_OP_FORK: {
             int pip[2];
             int err = pipe(pip);
             if (err) {
                 push_syscall_response(scf_buf, desc_index, err);
-                return;
+                break;
             }
             int pid = fork();
             if (pid) {
@@ -157,12 +181,38 @@ void poll_requests(void)
                 int ret = write(pip[1], &response, sizeof(int));
                 assert(ret == sizeof(int));
                 close(pip[1]);
-                return;
             }
-            return;
+            break;
+        }
+        case IPC_OP_STAT: {
+            uint64_t *args = desc.args;
+            const char* path = (char *)args[0];
+            struct stat st;
+            int ret = stat(path, &st);
+            if (ret == 0) {
+                push_syscall_response(scf_buf, desc_index, st.st_size);
+            } else {
+                push_syscall_response(scf_buf, desc_index, ret);
+            }
+        }
+        case IPC_OP_CLONE: {
+            thread_count++;
+            push_syscall_response(scf_buf, desc_index, 0);
+            break;
+        }
+        case IPC_OP_EXIT: {
+            printf("Shadow: exit, thread count: %d\n", thread_count);
+            if (thread_count == 1) {
+                ioctl(nimbos_fd, NIMBOS_EXIT, NULL);
+                push_syscall_response(scf_buf, desc_index, 0);
+                exit(0);
+            } else {
+                thread_count--;
+                push_syscall_response(scf_buf, desc_index, 0);
+            }
         }
         default:
-            return;
+            break;
         }
     }
 }
@@ -193,7 +243,7 @@ int nimbos_setup_syscall()
         return err;
     }
     set_slot_num(slot_num);
-    printf("syscall: slot_num=%d\n", slot_num);
+    // printf("syscall: slot_num=%d\n", slot_num);
     signal(NIMBOS_SYSCALL_SIG_NUM, nimbos_syscall_handler);
 
     // handle requests before app starting

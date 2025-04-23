@@ -51,12 +51,17 @@ long nimbos_ioctl(struct file *file, unsigned int ioctl, unsigned long arg)
     switch (ioctl) {
     case NIMBOS_SYSCALL_SETUP: {
         int slot_num = allocate_slot_num();
+        pr_info("Slot %d allocated.\n", slot_num);
         if (slot_num < 0) {
             err = -EBUSY;
             break;
         }
         err = nimbos_syscall_setup(slot_num);
         copy_to_user((int *)arg, (int *)&slot_num, sizeof(int));
+        break;
+    }
+    case NIMBOS_EXIT: {
+        nimbos_deregister_process(get_current());
         break;
     }
     default:
@@ -80,7 +85,7 @@ int nimbos_mmap(struct file *file, struct vm_area_struct *vma)
         return -EINVAL;
     }
 
-    if (paddr <= rt_region.start || paddr >= rt_region.start + rt_region.size) {
+    if (paddr < rt_region.start || paddr >= rt_region.start + rt_region.size) {
         return -EINVAL;
     }
 

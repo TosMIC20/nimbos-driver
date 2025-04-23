@@ -23,15 +23,19 @@ inline void set_slot_num(int slot_num) {
 int nimbos_setup_syscall_buffers(int nimbos_fd, int slot_num)
 {
     uint64_t syscall_queue_buf_paddr = NIMBOS_SYSCALL_QUEUE_BUF_SLOT_PADDR(slot_num);
-    void *syscall_queue_buf_base_vaddr = (void *)SHADOW_KERNEL_PADDR_TO_VADDR((void *)syscall_queue_buf_paddr);
+    syscall_queue_buf_base = (void *)SHADOW_KERNEL_PADDR_TO_VADDR((void *)syscall_queue_buf_paddr);
 
-    // printf("Shadow: map [%p, %p)\n", syscall_queue_buf_base_vaddr, syscall_queue_buf_base_vaddr + NIMBOS_SYSCALL_QUEUE_BUF_SIZE);
-    syscall_queue_buf_base = mmap(syscall_queue_buf_base_vaddr, NIMBOS_SYSCALL_QUEUE_BUF_SIZE, PROT_READ | PROT_WRITE,
-                                  MAP_SHARED | MAP_POPULATE, nimbos_fd, syscall_queue_buf_paddr - NIMBOS_BASE_PADDR);
-    if (syscall_queue_buf_base == MAP_FAILED) {
+    // printf("Shadow: map [%x, %x)\n", SHADOW_KERNEL_PADDR_TO_VADDR(NIMBOS_KERNEL_BASE_PADDR), SHADOW_KERNEL_PADDR_TO_VADDR(NIMBOS_KERNEL_BASE_PADDR) + NIMBOS_KERNEL_MAXSIZE);
+    void *nimbos_kernel_base = mmap(
+        (void *)SHADOW_KERNEL_PADDR_TO_VADDR(NIMBOS_KERNEL_BASE_PADDR), NIMBOS_KERNEL_MAXSIZE,
+        PROT_READ | PROT_WRITE,
+        MAP_SHARED | MAP_POPULATE | MAP_FIXED, 
+        nimbos_fd, 
+        NIMBOS_KERNEL_BASE_PADDR - NIMBOS_BASE_PADDR
+    );
+    if (nimbos_kernel_base == MAP_FAILED) {
         return -ENOMEM;
     }
-    // printf("Shadow: Actual address: %p\n", syscall_queue_buf_base);
 
     struct syscall_queue_buffer_metadata *meta = syscall_queue_buf_base;
     struct scf_descriptor *desc;
