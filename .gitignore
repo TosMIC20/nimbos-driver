@@ -7,3 +7,7 @@
 Module.symvers
 modules.order
 .vscode
+userapps/build
+**/CMakeFiles/
+CMakeCache.txt
+linux

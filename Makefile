@@ -12,6 +12,10 @@ module := nimbos_driver
 subdir-y := apps/
 obj-m := driver/
 
+user:
+	make -C userapps build
+	ln -sf userapps/build/x86_64/bin linux
+
 build:
 	$(MAKE) -C $(KDIR) M=$$PWD modules
 
