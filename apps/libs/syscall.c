@@ -194,6 +194,7 @@ void poll_requests(void)
             } else {
                 push_syscall_response(scf_buf, desc_index, ret);
             }
+            break;
         }
         case IPC_OP_CLONE: {
             thread_count++;
@@ -201,7 +202,7 @@ void poll_requests(void)
             break;
         }
         case IPC_OP_EXIT: {
-            printf("Shadow: exit, thread count: %d\n", thread_count);
+            // printf("Shadow: exit, thread count: %d\n", thread_count);
             if (thread_count == 1) {
                 ioctl(nimbos_fd, NIMBOS_EXIT, NULL);
                 push_syscall_response(scf_buf, desc_index, 0);
@@ -210,6 +211,7 @@ void poll_requests(void)
                 thread_count--;
                 push_syscall_response(scf_buf, desc_index, 0);
             }
+            break;
         }
         default:
             break;
